@@ -116,11 +116,11 @@ void reply_messange(char *xbee_reply, char *messange);
 
 void check_addr(char *xbee_reply, char *messenger);
 
-NetworkInterface* net = wifi;
+//NetworkInterface* net = wifi;
 
-MQTTNetwork mqttNetwork(net);
+//MQTTNetwork mqttNetwork(net);
 
-MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
+//MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
 
 void messageArrived(MQTT::MessageData& md) {
 
@@ -183,8 +183,6 @@ int main() {
       pc.baud(9600);
 
       char xbee_reply[4];
-
-  // XBee setting
 
       xbee.baud(9600);
 
@@ -273,14 +271,12 @@ int main() {
       xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
 
 
-      //NetworkInterface* net = wifi;
+      NetworkInterface* net = wifi;
 
-      //MQTTNetwork mqttNetwork(net);
+      MQTTNetwork mqttNetwork(net);
 
-      //MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
+      MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
 
-
-      //TODO: revise host to your ip
 
       const char* host = "192.168.0.111";
 
@@ -326,10 +322,10 @@ int main() {
       //Ticker log_accTicker;
 
       //log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);
-
-      acc_queue.event(&count_acc);
-
-      //btn2.rise(mqtt_queue.event(&publish_message, &client));
+      
+      //acc_queue.event(&count_acc);
+      log_acc();
+      btn2.rise(mqtt_queue.event(&publish_message, &client));
 
       btn3.rise(&close_mqtt);
 
@@ -383,7 +379,7 @@ int main() {
 
 }
 
-void count_acc(){
+/*void count_acc(){
       Timer timer_wait;
       timer_wait.start();
       //mqtt_queue.event(&publish_message, &client)
@@ -436,7 +432,7 @@ void count_acc(){
                   }
             }
       }
-}
+}*/
 
 
 void log_acc() {
