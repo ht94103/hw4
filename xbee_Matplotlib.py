@@ -25,29 +25,29 @@ print("Enter AT mode.")
 print(char.decode())
 
 
-s.write("ATMY <BASE_MY>\r\n".encode())
+s.write("ATMY 0x187\r\n".encode())
 
 char = s.read(3)
 
-print("Set MY <BASE_MY>.")
+print("Set MY 0x187.")
 
 print(char.decode())
 
 
-s.write("ATDL <BASE_DL>\r\n".encode())
+s.write("ATDL 0x178\r\n".encode())
 
 char = s.read(3)
 
-print("Set DL <BASE_DL>.")
+print("Set DL 0x178.")
 
 print(char.decode())
 
 
-s.write("ATID <PAN_ID>\r\n".encode())
+s.write("ATID 0x3\r\n".encode())
 
 char = s.read(3)
 
-print("Set PAN ID <PAN_ID>.")
+print("Set PAN ID 0x3.")
 
 print(char.decode())
 
@@ -87,33 +87,40 @@ print("Exit AT mode.")
 
 print(char.decode())
 
-print("start sending RPC")
+print("start sending RPC after 17 seconds")
 
-for i in range 10:
+time.sleep(17)
 
-    s.write("/myled1/write 1\r".encode())
+print("start")
 
-    line = s.readline()
+for i in range (10):
 
-    data[i] = int(line)
+	s.write("/myled1/write 1\r".encode())
 
-    time.sleep(1)
+	print(2*i)
 
-    s.write("/myled1/write 0\r".encode())
+	line = s.readline()
 
-    line = s.readline()
+	data[2*i] = int(line.decode())
 
-    data[i] = int(line)
+	time.sleep(1)
 
-    time.sleep(1)
+	s.write("/myled1/write 0\r".encode())
+
+	print(2*i + 1)
+
+	line = s.readline()
+
+	data[2*i + 1] = int(line.decode())
+
+	time.sleep(1)
 
 
 Time = np.arange(0, 20, 1)
 
+#print(data)
 
-plt.plot(Time, x, color = "green")
-
-#plt.ylim(-1.5, 1.5)
+plt.plot(Time, data, color = "green")
 
 plt.xlabel("Time")
 

@@ -6,8 +6,6 @@
 
 #include "MQTTClient.h"
 
-#include "mbed.h"
-
 #include "fsl_port.h"
 
 #include "fsl_gpio.h"
@@ -65,6 +63,8 @@ void FXOS8700CQ_writeRegs(uint8_t * data, int len);
 
 void log_acc();
 
+void count_acc();
+
 float t[3]; 
 
 uint8_t who_am_i, data[2], res[6];
@@ -92,11 +92,11 @@ volatile bool closed = false;
 const char* topic = "Mbed";
 
 
-Thread mqtt_thread;
+Thread mqtt_thread(osPriorityLow);
 
-Thread acc_thread;
+Thread acc_thread(osPriorityHigh);
 
-Thread xbee_thread;
+Thread xbee_thread(osPriorityLow);
 
 EventQueue mqtt_queue(32 * EVENTS_EVENT_SIZE);
 
@@ -106,11 +106,7 @@ EventQueue xbee_queue(32 * EVENTS_EVENT_SIZE);
 
 RpcDigitalOut myled1(LED1,"myled1");
 
-int num = 0
-
-//Timer timer_acc;
-
-//Timer timer_wait;
+int number = 0;
 
 void xbee_rx_interrupt(void);
 
@@ -120,13 +116,13 @@ void reply_messange(char *xbee_reply, char *messange);
 
 void check_addr(char *xbee_reply, char *messenger);
 
+NetworkInterface* net = wifi;
 
+MQTTNetwork mqttNetwork(net);
+
+MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
 
 void messageArrived(MQTT::MessageData& md) {
-      
-      //Timer timer_wait;
-
-      //timer_wait.start();
 
       MQTT::Message &message = md.message;
 
@@ -137,12 +133,6 @@ void messageArrived(MQTT::MessageData& md) {
       printf(msg);
 
       wait_ms(1000);
-      /*while(1){
-            if (timer_wait.read() > 1){
-                  timer_wait.reset();
-                  break;
-            }
-      }*/
 
       char payload[300];
 
@@ -157,41 +147,13 @@ void messageArrived(MQTT::MessageData& md) {
 
 void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
 
-      Timer timer_num;
-
-      Timer timer_wait;
-
-      timer_num.start();
-
-      timer_wait.start();
-
-      int j = 10, p = 0, tilt = 1;
-
-      while(1){
-
-      if (timer_num.read() > 1.0){
-            timer_num.reset();
-            num = 0;
-      }
-
       message_num++;
 
       MQTT::Message message;
 
       char buff[100];
 
-      log_acc();
-
-      sprintf(buff, "FXOS8700Q ACC: X=%1.4f(%x%x) Y=%1.4f(%x%x) Z=%1.4f(%x%x)\r\n",\
-
-            t[0], res[0], res[1],\
-
-            t[1], res[2], res[3],\
-
-            t[2], res[4], res[5]\
-
-      );
-
+      sprintf(buff, "999.9\n%1.4f\n%1.4f\n%1.4f\n", t[0], t[1], t[2]);
 
       message.qos = MQTT::QOS0;
 
@@ -205,81 +167,7 @@ void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
 
       int rc = client->publish(topic, message);
 
-
-      printf("rc:  %d\r\n", rc);
-
-      printf("Puslish message: %s\r\n", buff);
-
-      if (AccData[i][2]*AccData[i][2] < (AccData[i][0]*AccData[i][0] + AccData[i][1]*AccData[i][1] + AccData[i][2]*AccData[i][2])/2){
-            p = tilt;
-            tilt = 1;
-                  //j = 0;
-                  if ((j == 10) && (p != 1)){
-                        j = 0;
-                  }
-            }
-      else {
-            p = tilt;
-            tilt = 0;
-      }
-
-      if ((j < 10) || (tilt == 1)){
-                  while(1){
-                        if (timer_wait.read() > 0.1){
-                              timer_wait.reset();
-                              break;
-                        }
-                  }
-                  num++;
-                  j++;
-            }
-            if (j == 10 && tilt == 1){
-      `           while(1){
-                  if (timer_wait.read() > 0.5){
-                        timer_wait.reset();
-                        break;
-                  }
-                  num++;
-            }            
-      }
-
-      else {
-            while(1){
-                  if (timer_wait.read() > 0.5){
-                        timer_wait.reset();
-                        break;
-                  }
-                  num++;
-            }
-
-
-      /*if (AccData[i][2]*AccData[i][2] < (AccData[i][0]*AccData[i][0] + AccData[i][1]*AccData[i][1] + AccData[i][2]*AccData[i][2])/2){
-            tilt = 1;
-            while(1){
-            if (timer_wait.read() > 0.1){
-                  timer_wait.reset();
-                  break;
-            }
-            num++;
-            i++;
-      }
-      else {
-            while(1){
-            if (timer_wait.read() > 0.5){
-                  timer_wait.reset();
-                  break;
-            }
-            num++;
-      }*/
-
-      //wait(0.5);
-      /*while(1){
-            if (timer_wait.read() > 0.5){
-                  timer_wait.reset();
-                  break;
-            }*/
-      
-
+      printf("%s", buff);
 }
 
 
@@ -294,9 +182,11 @@ int main() {
 
       pc.baud(9600);
 
-      xbee.baud(9600);
-
       char xbee_reply[4];
+
+  // XBee setting
+
+      xbee.baud(9600);
 
       xbee.printf("+++");
 
@@ -306,11 +196,11 @@ int main() {
 
       if(xbee_reply[0] == 'O' && xbee_reply[1] == 'K'){
 
-      pc.printf("enter AT mode.\r\n");
+            pc.printf("enter AT mode.\r\n");
 
-      xbee_reply[0] = '\0';
+            xbee_reply[0] = '\0';
 
-      xbee_reply[1] = '\0';
+            xbee_reply[1] = '\0';
 
       }
 
@@ -350,7 +240,9 @@ int main() {
 
       xbee.getc();
 
+      xbee_thread.start(callback(&xbee_queue, &EventQueue::dispatch_forever));
 
+      //xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
 
       wifi = WiFiInterface::get_default_instance();
 
@@ -376,13 +268,16 @@ int main() {
 
       }
 
+      //xbee_thread.start(callback(&xbee_queue, &EventQueue::dispatch_forever));
+
+      xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
 
 
-      NetworkInterface* net = wifi;
+      //NetworkInterface* net = wifi;
 
-      MQTTNetwork mqttNetwork(net);
+      //MQTTNetwork mqttNetwork(net);
 
-      MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
+      //MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
 
 
       //TODO: revise host to your ip
@@ -426,31 +321,21 @@ int main() {
 
       mqtt_thread.start(callback(&mqtt_queue, &EventQueue::dispatch_forever));
 
-      acc_thread.start(callback(&acc_queue, &EventQueue::dispatch_forever));
+      acc_thread.start(callback(&acc_queue, &EventQueue::dispatch_forever)); 
 
       //Ticker log_accTicker;
 
       //log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);
 
+      acc_queue.event(&count_acc);
+
       //btn2.rise(mqtt_queue.event(&publish_message, &client));
-
-      mqtt_queue.event(&publish_message, &client);
-     
-
 
       btn3.rise(&close_mqtt);
 
       pc.printf("start\r\n");
 
-      xbee_thread.start(callback(&xbee_queue, &EventQueue::dispatch_forever));
-
-
-  // Setup a serial interrupt function of receiving data from xbee
-
-      xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
-
-
-      int num = 0;
+     int num = 0;
 
       while (num != 5) {
 
@@ -490,17 +375,79 @@ int main() {
 
       printf("Successfully closed!\n");
 
+      //xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
+
+      //while(1){wait(1);};
 
       return 0;
 
 }
 
-void log_acc() {
-   LED = !LED;
+void count_acc(){
+      Timer timer_wait;
+      timer_wait.start();
+      //mqtt_queue.event(&publish_message, &client)
+      int j = 10, p = 0, tilt = 1;
+      while (1){
+            log_acc();
+            mqtt_queue.event(&publish_message, &client);
+            printf("1");
+            if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
+                  p = tilt;
+                  tilt = 1;
+                  //j = 0;
+                  if ((j == 10) && (p != 1)){
+                        j = 0;
+                  }
+            }
+            else {
+                  p = tilt;
+                  tilt = 0;
+            }
 
+            if ((j < 10) || (tilt == 1)){
+                  while(1){
+                        if (timer_wait.read() > 0.1){
+                              timer_wait.reset();
+                              break;
+                        }
+                  }
+                  number++;
+                  j++;
+            
+                  if ((j == 10) && (tilt == 1)){
+                        while (1){
+                              if (timer_wait.read() > 0.5){
+                                    timer_wait.reset();
+                                    break;
+                              }
+                        number++;
+                  }
+            }            
+            }
+
+            else {
+                  while(1){
+                        if (timer_wait.read() > 0.5){
+                              timer_wait.reset();
+                              break;
+                        }
+                        number++;
+                  }
+            }
+      }
+}
+
+
+void log_acc() {
    uint8_t who_am_i, data[2], res[6];
    int16_t acc16;
+   //Timer timer_wait;
+   //timer_wait.start();
+   //int j = 10, p = 0, tilt = 1;
 
+   //while (1){ 
+      //printf("1");
    // Enable the FXOS8700Q
    FXOS8700CQ_readRegs( FXOS8700Q_CTRL_REG1, &data[1], 1);
    data[1] |= 0x01;
@@ -526,15 +473,51 @@ void log_acc() {
       if (acc16 > UINT14_MAX/2)
          acc16 -= UINT14_MAX;
       t[2] = ((float)acc16) / 4096.0f;
-      /*pc.print("FXOS8700Q ACC: X=%1.4f(%x%x) Y=%1.4f(%x%x) Z=%1.4f(%x%x)\r\n",\
 
-            t[0], res[0], res[1],\
+      /*** if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
+            p = tilt;
+            tilt = 1;
+                  //j = 0;
+                  if ((j == 10) && (p != 1)){
+                        j = 0;
+                  }
+      }
+      else {
+            p = tilt;
+            tilt = 0;
+      }
 
-            t[1], res[2], res[3],\
+      if ((j < 10) || (tilt == 1)){
+                  while(1){
+                        if (timer_wait.read() > 0.1){
+                              timer_wait.reset();
+                              break;
+                        }
+                  }
+                  number++;
+                  j++;
+            
+            if ((j == 10) && (tilt == 1)){
+                 while (1){
+                        if (timer_wait.read() > 0.5){
+                              timer_wait.reset();
+                              break;
+                        }
+                  number++;
+                  }
+            }            
+      }
 
-            t[2], res[4], res[5]\
-
-      );*/
+      else {
+            while(1){
+                  if (timer_wait.read() > 0.5){
+                        timer_wait.reset();
+                        break;
+                  }
+                  number++;
+            }
+      }
+      }***/
       
 }
 
@@ -558,7 +541,7 @@ void xbee_rx_interrupt(void)
 
   xbee.attach(NULL, Serial::RxIrq); // detach interrupt
 
-  queue.call(&xbee_rx);
+  xbee_queue.call(&xbee_rx);
 
 }
 
@@ -591,7 +574,11 @@ void xbee_rx(void)
 
     //pc.printf("%s\r\n", outbuf);
 
-    pc.printf("%d\r\n", num);
+    //printf("%d\r\n", number);
+
+    xbee.printf("%d\r\n", number);
+
+    number = 0;
 
     //wait(0.1);
 
