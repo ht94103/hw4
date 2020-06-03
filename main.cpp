@@ -67,6 +67,12 @@ void count_acc();
 
 float t[3]; 
 
+float ind = 999.9;
+
+int wait_ind = 0;
+
+int j = 10, p = 0, tilt = 1;
+
 uint8_t who_am_i, data[2], res[6];
 
 int16_t acc16;
@@ -92,7 +98,7 @@ volatile bool closed = false;
 const char* topic = "Mbed";
 
 
-Thread mqtt_thread(osPriorityLow);
+Thread mqtt_thread(osPriorityNormal);
 
 Thread acc_thread(osPriorityHigh);
 
@@ -153,7 +159,7 @@ void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
 
       char buff[100];
 
-      sprintf(buff, "999.9\n%1.4f\n%1.4f\n%1.4f\n", t[0], t[1], t[2]);
+      sprintf(buff, "%1.1f\n%1.4f\n%1.4f\n%1.4f\n", ind, t[0], t[1], t[2]);
 
       message.qos = MQTT::QOS0;
 
@@ -319,13 +325,13 @@ int main() {
 
       acc_thread.start(callback(&acc_queue, &EventQueue::dispatch_forever)); 
 
-      //Ticker log_accTicker;
+      Ticker log_accTicker;
 
-      //log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);
-      
-      //acc_queue.event(&count_acc);
-      log_acc();
-      btn2.rise(mqtt_queue.event(&publish_message, &client));
+      log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);
+
+      Ticker mqttTicker;
+
+      mqttTicker.attach(mqtt_queue.event(&publish_message, &client), 0.1f);
 
       btn3.rise(&close_mqtt);
 
@@ -470,50 +476,62 @@ void log_acc() {
          acc16 -= UINT14_MAX;
       t[2] = ((float)acc16) / 4096.0f;
 
-      /*** if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
+      if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
             p = tilt;
             tilt = 1;
-                  //j = 0;
-                  if ((j == 10) && (p != 1)){
+                  if ((j >= 10) && (p != 1)){
                         j = 0;
                   }
       }
       else {
             p = tilt;
             tilt = 0;
-      }
-
-      if ((j < 10) || (tilt == 1)){
-                  while(1){
-                        if (timer_wait.read() > 0.1){
-                              timer_wait.reset();
-                              break;
-                        }
-                  }
-                  number++;
-                  j++;
-            
-            if ((j == 10) && (tilt == 1)){
-                 while (1){
-                        if (timer_wait.read() > 0.5){
-                              timer_wait.reset();
-                              break;
-                        }
-                  number++;
-                  }
-            }            
-      }
-
-      else {
-            while(1){
-                  if (timer_wait.read() > 0.5){
-                        timer_wait.reset();
-                        break;
-                  }
-                  number++;
+            if (wait_ind > 5){
+                  wait_ind = 0;
             }
       }
-      }***/
+
+      if ((j <= 10) && (tilt == 1)){
+            if (ind = 111.1){
+                  ind = 999.9;
+            }
+            else {
+                  ind = 111.1;
+            }
+            number++;
+            j++;
+            wait_ind = 0;
+            if (j > 10){
+                  return;
+            }
+      }
+
+      else if ((j > 10) && (tilt == 1)){                  
+            if (wait_ind == 5){
+                  if (ind = 111.1){
+                        ind = 999.9;
+                  }
+                  else {
+                        ind = 111.1;
+                  }
+                  wait_ind++;
+                  number++;                 
+            }                
+      }         
+      
+
+      else {
+            if (wait_ind == 5){
+                  if (ind = 111.1){
+                        ind = 999.9;
+                  }
+                  else {
+                        ind = 111.1;
+                  }
+                  wait_ind++;
+                  number++;                 
+            }            
+      }
       
 }
 
