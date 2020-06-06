@@ -87,17 +87,17 @@ print("Exit AT mode.")
 
 print(char.decode())
 
-print("start sending RPC after 17 seconds")
-
-time.sleep(17)
-
 print("start")
+
+s.write("/myled1/write 0\r".encode())
+
+line = s.readline()        # discard the transient number
 
 for i in range (10):
 
 	s.write("/myled1/write 1\r".encode())
 
-	print(2*i)
+	print(2*i)    # check the loop is running and the RPC command is sent
 
 	line = s.readline()
 
@@ -107,7 +107,7 @@ for i in range (10):
 
 	s.write("/myled1/write 0\r".encode())
 
-	print(2*i + 1)
+	print(2*i + 1)   # check the loop is running and the RPC command is sent
 
 	line = s.readline()
 
@@ -117,8 +117,6 @@ for i in range (10):
 
 
 Time = np.arange(0, 20, 1)
-
-#print(data)
 
 plt.plot(Time, data, color = "green")
 

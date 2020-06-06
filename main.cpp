@@ -52,8 +52,25 @@
 
 #define FXOS8700Q_WHOAMI_VAL 0xC7
 
-I2C i2c( PTD9,PTD8);
+/******* The program can be compiled and may be failed (mbedOS error) after a short period when press restart on K66F.
+ * Please press restart again, it should be function well. If not, press again.
+ * You should wait until the static state. (Check if connected to wifi and xbee on screen first !)
+ * You should see the value (when static state) on screen like 
+ * 
+ * ...
+ * 999.5   // the indicator
+ * 0.0117  // x_acc
+ * 0.7603  // y_acc
+ * 0.6558  // z_acc
+ * 999.5   // the indicator
+ * 0.0117  // x_acc
+ * 0.7480  // y_acc
+ * 0.6548  // z_acc
+ * ...
+ * 
+ * then you can run the python program. **********/
 
+I2C i2c( PTD9,PTD8);
 
 int m_addr = FXOS8700CQ_SLAVE_ADDR1;
 
@@ -63,13 +80,11 @@ void FXOS8700CQ_writeRegs(uint8_t * data, int len);
 
 void log_acc();
 
-void count_acc();
-
 float t[3]; 
 
-float ind = 999.9;
+float ind = 999.5;    // To indicate the sampling process, it changes to 111.5 when samplin (0.1s or 0.5s), the python read the indicator to save the desire data
 
-int wait_ind = 0;
+int wait_ind = 0;    // Use when sampling time = 0.5
 
 int j = 10, p = 0, tilt = 1;
 
@@ -93,7 +108,6 @@ volatile int message_num = 0;
 volatile int arrivedcount = 0;
 
 volatile bool closed = false;
-
 
 const char* topic = "Mbed";
 
@@ -121,12 +135,6 @@ void xbee_rx(void);
 void reply_messange(char *xbee_reply, char *messange);
 
 void check_addr(char *xbee_reply, char *messenger);
-
-//NetworkInterface* net = wifi;
-
-//MQTTNetwork mqttNetwork(net);
-
-//MQTT::Client<MQTTNetwork, Countdown> client(mqttNetwork);
 
 void messageArrived(MQTT::MessageData& md) {
 
@@ -174,6 +182,7 @@ void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
       int rc = client->publish(topic, message);
 
       printf("%s", buff);
+
 }
 
 
@@ -246,8 +255,6 @@ int main() {
 
       xbee_thread.start(callback(&xbee_queue, &EventQueue::dispatch_forever));
 
-      //xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
-
       wifi = WiFiInterface::get_default_instance();
 
       if (!wifi) {
@@ -271,8 +278,6 @@ int main() {
             return -1;
 
       }
-
-      //xbee_thread.start(callback(&xbee_queue, &EventQueue::dispatch_forever));
 
       xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
 
@@ -327,11 +332,11 @@ int main() {
 
       Ticker log_accTicker;
 
-      log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);
+      log_accTicker.attach(acc_queue.event(&log_acc), 0.1f);   //To calculate acc every 0.1s
 
       Ticker mqttTicker;
 
-      mqttTicker.attach(mqtt_queue.event(&publish_message, &client), 0.1f);
+      mqttTicker.attach(mqtt_queue.event(&publish_message, &client), 0.1f);   //Send data to client every 0.1s, and client read the indicator to determine the sampling time
 
       btn3.rise(&close_mqtt);
 
@@ -377,80 +382,13 @@ int main() {
 
       printf("Successfully closed!\n");
 
-      //xbee.attach(xbee_rx_interrupt, Serial::RxIrq);
-
-      //while(1){wait(1);};
-
       return 0;
 
 }
 
-/*void count_acc(){
-      Timer timer_wait;
-      timer_wait.start();
-      //mqtt_queue.event(&publish_message, &client)
-      int j = 10, p = 0, tilt = 1;
-      while (1){
-            log_acc();
-            mqtt_queue.event(&publish_message, &client);
-            printf("1");
-            if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
-                  p = tilt;
-                  tilt = 1;
-                  //j = 0;
-                  if ((j == 10) && (p != 1)){
-                        j = 0;
-                  }
-            }
-            else {
-                  p = tilt;
-                  tilt = 0;
-            }
-
-            if ((j < 10) || (tilt == 1)){
-                  while(1){
-                        if (timer_wait.read() > 0.1){
-                              timer_wait.reset();
-                              break;
-                        }
-                  }
-                  number++;
-                  j++;
-            
-                  if ((j == 10) && (tilt == 1)){
-                        while (1){
-                              if (timer_wait.read() > 0.5){
-                                    timer_wait.reset();
-                                    break;
-                              }
-                        number++;
-                  }
-            }            
-            }
-
-            else {
-                  while(1){
-                        if (timer_wait.read() > 0.5){
-                              timer_wait.reset();
-                              break;
-                        }
-                        number++;
-                  }
-            }
-      }
-}*/
-
-
 void log_acc() {
    uint8_t who_am_i, data[2], res[6];
    int16_t acc16;
-   //Timer timer_wait;
-   //timer_wait.start();
-   //int j = 10, p = 0, tilt = 1;
-
-   //while (1){ 
-      //printf("1");
-   // Enable the FXOS8700Q
    FXOS8700CQ_readRegs( FXOS8700Q_CTRL_REG1, &data[1], 1);
    data[1] |= 0x01;
    data[0] = FXOS8700Q_CTRL_REG1;
@@ -476,61 +414,53 @@ void log_acc() {
          acc16 -= UINT14_MAX;
       t[2] = ((float)acc16) / 4096.0f;
 
-      if (t[2]*t[2] < (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
+/***** To determine the moment if tilt changes from < 45 degree to >= 45 degree *****/ 
+      if (t[2]*t[2] <= (t[0]*t[0] + t[1]*t[1] + t[2]*t[2])/2){
             p = tilt;
             tilt = 1;
-                  if ((j >= 10) && (p != 1)){
+                  if ((j >= 9) && (p != 1)){
                         j = 0;
                   }
       }
       else {
             p = tilt;
             tilt = 0;
-            if (wait_ind > 5){
-                  wait_ind = 0;
-            }
       }
 
-      if ((j <= 10) && (tilt == 1)){
-            if (ind = 111.1){
-                  ind = 999.9;
+/***** To change the indicator and increase number use in xbee every time *****/
+
+      if (j <= 9){
+
+            if (ind < 500){
+                  ind = 999.5;
             }
             else {
-                  ind = 111.1;
+                  ind = 111.5;
             }
             number++;
             j++;
             wait_ind = 0;
-            if (j > 10){
+            if (j > 9){
                   return;
             }
       }
-
-      else if ((j > 10) && (tilt == 1)){                  
-            if (wait_ind == 5){
-                  if (ind = 111.1){
-                        ind = 999.9;
-                  }
-                  else {
-                        ind = 111.1;
-                  }
-                  wait_ind++;
-                  number++;                 
-            }                
-      }         
-      
+         
+/***** To increase or reset the indicator and increase number use in xbee  *****/  
 
       else {
-            if (wait_ind == 5){
-                  if (ind = 111.1){
-                        ind = 999.9;
+            if (wait_ind == 4){
+                  if (ind < 500){
+                        ind = 999.5;
                   }
                   else {
-                        ind = 111.1;
-                  }
-                  wait_ind++;
-                  number++;                 
-            }            
+                        ind = 111.5;
+                  }                 
+            }  
+            wait_ind++;
+            number++;        
+      }
+      if (wait_ind >= 5){
+                  wait_ind = 0;
       }
       
 }
@@ -580,21 +510,16 @@ void xbee_rx(void)
 
       }
 
-      buf[i] = recv; //pc.putc(recv);
+      buf[i] = recv; 
 
     }
 
     RPC::call(buf, outbuf);
 
-    //pc.printf("%s\r\n", outbuf);
-
-    //printf("%d\r\n", number);
-
     xbee.printf("%d\r\n", number);
 
-    number = 0;
+    number = 0;  // reset number every time when RPC command arrived
 
-    //wait(0.1);
 
   }
 
