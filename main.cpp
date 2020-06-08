@@ -53,7 +53,7 @@
 #define FXOS8700Q_WHOAMI_VAL 0xC7
 
 /******* The program can be compiled and may be failed (mbedOS error) after a short period when press restart on K66F.
- * Please press restart again, it should be function well. If not, press again.
+ * Please press reset again, it should be function well. If not, press again.
  * You should wait until the static state. (Check if connected to wifi and xbee on screen first !)
  * You should see the value (when static state) on screen like 
  * 
@@ -68,7 +68,10 @@
  * 0.6548  // z_acc
  * ...
  * 
- * then you can run the python program. **********/
+ * then you can run the python program.
+ * The python program may fail due to unknown reason. (It may send RPC commands for 5 times in the first run and then receive nothing
+ * so the program won't contimue, but it may only send 3 RPC commands for 3 times the next time and then receive nothing.)
+ *********/
 
 I2C i2c( PTD9,PTD8);
 
